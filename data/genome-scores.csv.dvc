@@ -1,0 +1,5 @@
+outs:
+- md5: 9c6c86e2452a785b6b41ebfaff5354c9
+  size: 521514541
+  hash: md5
+  path: genome-scores.csv

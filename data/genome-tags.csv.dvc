@@ -1,0 +1,5 @@
+outs:
+- md5: 3a83b71493e852ec5a352fca3af93dab
+  size: 18103
+  hash: md5
+  path: genome-tags.csv
