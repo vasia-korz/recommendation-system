@@ -217,12 +217,13 @@ class ClusterBasedRegressor(BaseEstimator, RegressorMixin):
         Multiplier for year values.
     """
 
-    def __init__(self, movies_hot_df, n_movie_clusters=5, rating_multiplier=5, year_multiplier=0.05):
+    def __init__(self, movies_hot_df, n_movie_clusters=5, rating_multiplier=5, year_multiplier=0.05, random_state=None):
         self.users_df = None
         self.movies_hot_df = movies_hot_df.copy()
         self.n_movie_clusters = n_movie_clusters
         self.rating_multiplier = rating_multiplier
         self.year_multiplier = year_multiplier
+        self.random_state = random_state
 
     def fit(self, X, y=None):
         """
@@ -242,7 +243,7 @@ class ClusterBasedRegressor(BaseEstimator, RegressorMixin):
         self.movies_hot_df["rating_mean"] *= self.rating_multiplier
         self.movies_hot_df['year'] *= self.year_multiplier
 
-        kmeans = KMeans(n_clusters=self.n_movie_clusters, random_state=42, n_init="auto")
+        kmeans = KMeans(n_clusters=self.n_movie_clusters, random_state=self.random_state, n_init="auto")
         self.movies_hot_df['Cluster'] = kmeans.fit_predict(self.movies_hot_df.drop(["Genres_Split"], axis=1))
 
         self.movies_hot_df["rating_mean"] /= self.rating_multiplier
