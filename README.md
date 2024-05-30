@@ -15,10 +15,9 @@ Each file in the repository has it's own purpose.
 | [.dvc](.dvc) | Folder for DVC
 | [data](data) | Directory with dataset metadata
 | [.dvcignore](.dvcignore) | File to ensure proper data version control
-| [analysis.ipynb](analysis.ipynb)  | Exploratory analysis of the features
 | [movie_lens_libs.py](movie_lens_lib.py) | The library itself
-| [sample.ipynb](samples.ipynb) | A set of use cases from the library
-| [test.ipynb](tests.ipynb) | The comparison of the model with the baselines using train-test split and MSE, MAE and accuracy as metrics 
+| [sample.ipynb](sample.ipynb) | A set of use cases from the library
+| [test.ipynb](test.ipynb) | The comparison of the model with the baselines using train-test split and MSE, MAE and accuracy as metrics 
 
 ## Getting started
 
