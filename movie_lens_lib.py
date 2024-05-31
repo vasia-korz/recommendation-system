@@ -228,7 +228,7 @@ class ClusterBasedRegressor(BaseEstimator, RegressorMixin):
         self.rating_multiplier = rating_multiplier
         self.year_multiplier = year_multiplier
         self.random_state = random_state
-        self.cluster_columns = np.array(["Cluster_mean_{i}" for i in range(n_movie_clusters)])
+        self.cluster_columns = np.array([f"Cluster_mean_{i}" for i in range(n_movie_clusters)])
 
     def fit(self, X, y=None):
         """
@@ -295,13 +295,19 @@ class ClusterBasedRegressor(BaseEstimator, RegressorMixin):
         Predicted ratings.
         """
         y_pred = np.zeros(X.shape[0]) + 3.5
-        is_present = (X["userId"].isin(self.users_df.index) & X["movieId"].isin(self.movies_hot_df))
+        is_present = (X["userId"].isin(self.users_df.index) & X["movieId"].isin(self.movies_hot_df.index))
+        present_df = X.loc[is_present]
 
-        clusters = self.movies_hot_df.loc[X.loc[is_present]["movieId"]]["Cluster"].astype(int)
-        user_pred = self.users_df.loc[X[is_present]["userId"]][self.cluster_columns[clusters]]
+        clusters = self.movies_hot_df.loc[present_df["movieId"]]["Cluster"].astype(int)
+        columns = self.users_df[self.cluster_columns].columns
 
+        choices = pd.Series(self.cluster_columns[clusters])
+        choices = choices.apply(lambda x: columns.isin([x]).astype(int))
+        choices = np.vstack(choices)
+
+        user_pred = (self.users_df.loc[present_df["userId"]][self.cluster_columns] * choices).sum(axis=1)
         y_pred[is_present] = user_pred
-        return np.round(user_pred * 2) / 2 if rounded else user_pred
+        return np.round(y_pred * 2) / 2 if rounded else y_pred
 
 
 class MovieBasedRegressor(BaseEstimator, RegressorMixin):
