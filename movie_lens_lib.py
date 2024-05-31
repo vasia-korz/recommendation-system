@@ -143,33 +143,35 @@ class GenreBasedRegressor(BaseEstimator, RegressorMixin):
         #### Returns:
         Fitted regressor.
         """
-        ratings_train_df = pd.concat([X, y], axis=1)
-        self.user_genre_df = pd.DataFrame({"userId": ratings_train_df["userId"].unique()})
         genres = self.movies_hot_df["Genres_Split"].explode().unique()
+        user_ids = X["userId"].unique()
 
-        for genre in genres:
-            self.user_genre_df[genre] = pd.Series(np.zeros(self.user_genre_df.shape[0]))
-            self.user_genre_df["count_" + genre] = pd.Series(np.zeros(self.user_genre_df.shape[0]))
+        def normalize(df):
+            df["total"] /= df["count"]
+            return df
+        
+        def column_labels(df):
+            df.columns = [f'{stat}_{genre}' for stat, genre in df.columns]
+            return df
 
-        self.user_genre_df.set_index("userId", inplace=True)
-
-        movies_exploded_df = self.movies_hot_df[["Genres_Split"]].explode('Genres_Split').rename(
-            columns={'Genres_Split': 'genre'})
-        merged_df = ratings_train_df.merge(movies_exploded_df, on='movieId')
-
-        agg_df = merged_df.groupby(['userId', 'genre']).agg(
-            total_rating=('rating', 'sum'),
-            count=('rating', 'count')
-        ).reset_index()
-
-        agg_df['mean'] = agg_df['total_rating'] / agg_df['count']
-
-        self.user_genre_df = agg_df.pivot(index='userId', columns='genre', values=['mean', 'count'])
-        self.user_genre_df.columns = [f'{stat}_{genre}' for stat, genre in self.user_genre_df.columns]
-        self.user_genre_df = self.user_genre_df.reset_index()
-        self.user_genre_df.fillna(3.5, inplace=True)
-        self.user_genre_df.drop(["count_" + col for col in genres], axis=1, inplace=True)
-        self.user_genre_df.set_index("userId", inplace=True)
+        self.user_genre_df = (
+            self.movies_hot_df[["Genres_Split"]]
+                .explode('Genres_Split')
+                .merge(pd.concat([X, y], axis=1).drop(['timestamp'], axis=1),on='movieId')
+                .drop(["movieId"], axis=1)
+                .groupby(['userId', 'Genres_Split'])
+                .agg(total=('rating', 'sum'), count=('rating', 'count'))
+                .pipe(normalize)
+                .drop(["count"], axis=1)
+                .reset_index()
+                .rename(columns={"total": "mean"})
+                .pivot(
+                    index='userId',
+                    columns='Genres_Split',
+                    values=['mean'])
+                .pipe(column_labels)
+                .fillna(3.5)
+        )
 
         self.genres_rating_columns = (self.movies_hot_df["Genres_Split"]
                                       .apply(lambda x: np.array(["mean_"+y for y in x])))
