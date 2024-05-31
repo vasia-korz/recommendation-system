@@ -243,8 +243,6 @@ class ClusterBasedRegressor(BaseEstimator, RegressorMixin):
         #### Returns:
         Fitted regressor.
         """
-        ratings_train_df = pd.concat([X, y], axis=1)
-
         self.movies_hot_df["rating_mean"] *= self.rating_multiplier
         self.movies_hot_df['year'] *= self.year_multiplier
 
@@ -253,32 +251,37 @@ class ClusterBasedRegressor(BaseEstimator, RegressorMixin):
 
         self.movies_hot_df["rating_mean"] /= self.rating_multiplier
 
-        ratings_with_clusters = ratings_train_df.merge(self.movies_hot_df, left_on='movieId', right_index=True)
+        def column_labels(df):
+            df.columns = [f'Cluster_{stat}_{cluster}' for stat, cluster in df.columns]
+            return df
 
-        user_cluster_stats = ratings_with_clusters.groupby(['userId', 'Cluster'])['rating'].agg(
-            ['count', 'sum']).reset_index()
-        user_cluster_pivot = user_cluster_stats.pivot(index='userId', columns='Cluster',
-                                                      values=['count', 'sum']).fillna(0)
-        user_cluster_pivot.columns = [f'Cluster_{stat}_{cluster}' for stat, cluster in user_cluster_pivot.columns]
+        self.users_df = (
+            pd.concat([X.drop(['timestamp'], axis=1), y], axis=1)
+                .merge(self.movies_hot_df['Cluster'], left_on='movieId', right_index=True)
+                .drop(['movieId'], axis=1)
+                .groupby(['userId', 'Cluster'])['rating']
+                .agg(['count', 'sum'])
+                .reset_index()
+                .pivot(
+                    index='userId',
+                    columns='Cluster',
+                    values=['count', 'sum'])
+                .fillna(0)
+                .pipe(column_labels)
+        )
+        
 
         for cluster in range(self.n_movie_clusters):
             count_col = f'Cluster_count_{cluster}'
             sum_col = f'Cluster_sum_{cluster}'
             mean_col = f'Cluster_mean_{cluster}'
-            if count_col in user_cluster_pivot.columns and sum_col in user_cluster_pivot.columns:
-                user_cluster_pivot[mean_col] = user_cluster_pivot[sum_col] / user_cluster_pivot[count_col]
-            else:
-                user_cluster_pivot[count_col] = 0
-                user_cluster_pivot[sum_col] = 0
-                user_cluster_pivot[mean_col] = 0
+            self.users_df[mean_col] = self.users_df[sum_col] / self.users_df[count_col]
 
-        user_cluster_pivot = user_cluster_pivot.fillna(0)
-        self.users_df = user_cluster_pivot.reset_index()
-        self.users_df.set_index("userId", inplace=True)
 
-        sum_sums = self.users_df[["Cluster_sum_" + str(x) for x in range(self.n_movie_clusters)]].sum(axis=1)
-        count_sums = self.users_df[["Cluster_count_" + str(x) for x in range(self.n_movie_clusters)]].sum(axis=1)
-        self.users_df["rating_mean"] = sum_sums / count_sums
+
+        # sum_sums = self.users_df[["Cluster_sum_" + str(x) for x in range(self.n_movie_clusters)]].sum(axis=1)
+        # count_sums = self.users_df[["Cluster_count_" + str(x) for x in range(self.n_movie_clusters)]].sum(axis=1)
+        # self.users_df["rating_mean"] = sum_sums / count_sums
         return self
 
     def predict(self, X, rounded=True):
