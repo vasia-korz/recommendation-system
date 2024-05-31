@@ -52,6 +52,7 @@ def hybrid_vs_baselines_visualization(results: dict):
 
 
 def hybrid_metrics_by_user_records(results, thresholds):
+    sns.set_theme(style="whitegrid")
     mse_values = [results[thresh]['mse'] for thresh in thresholds]
     mae_values = [results[thresh]['mae'] for thresh in thresholds]
     accuracy_values = [results[thresh]['accuracy'] for thresh in thresholds]
@@ -81,23 +82,28 @@ def hybrid_metrics_by_user_records(results, thresholds):
     labels = [line.get_label() for line in lines_labels]
     ax1.legend(lines_labels, labels, loc='upper left')
 
-    ax1.grid(True)
+    ax1.grid(True, color='#e8e8e8')
     ax2.grid(False)
     fig.tight_layout()
     plt.show()
 
 
 def hybrid_metrics_by_cluster_size(hybrid_results: dict):
+    sns.set_theme(style="whitegrid")
     metrics_to_plot = ['mse', 'mae']
     fig, axs = plt.subplots(len(metrics_to_plot), 1, figsize=(5, 8))
 
+    sorted_keys = sorted(hybrid_results.keys())
     for i, metric in enumerate(metrics_to_plot):
-        data = [hybrid_results[k][metric] for k in sorted(hybrid_results.keys())]
-        
-        axs[i].plot(sorted(hybrid_results.keys()), data, marker='o')
+        data = [hybrid_results[k][metric] for k in sorted_keys]
+
+        axs[i].plot(sorted_keys, data, marker='o')
         axs[i].set_title(metric.upper(), fontsize=14)
         axs[i].set_xlabel('Number of clusters', fontsize=12)
         axs[i].set_ylabel(metric.upper(), fontsize=12)
+        axs[i].set_xticks(sorted_keys)
+        axs[i].set_xticklabels(sorted_keys)
+        axs[i].grid(color='#e8e8e8')
 
     plt.tight_layout()
     plt.show()
