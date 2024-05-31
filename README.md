@@ -1,11 +1,11 @@
 # Movie recommendation system
 
 ## About the project
-This repository is created for educational purposes. Famous [Movie Lens](https://grouplens.org/datasets/movielens/) was considered. The version we tuned the parameters on is `ml-latest.zip`. The description of the dataset among with the problem definition can be found on the website.
+This repository is created for educational purposes. Famous [Movie Lens](https://grouplens.org/datasets/movielens/) was considered. The version we tuned the parameters on is `ml-latest.zip`. The description of the dataset can be found on the website.
 
-It is also important to understand that this was also an attempt to present a simple solution without that intensive computations, which is wise considering the size of the data. Of course, in some situation the implementation is strongly coupled with the dataset, however, in this way we employ our knowledge about dataset.
+It is also important to understand that this repository is an attempt to present a simple solution without extremely intensive computations, which is wise considering the size of the data. Of course, the implementation is strongly coupled with the dataset, however, there are some parameters to tweak the model for a different distribution.
 
-Additionally, the code follows the schema of [Transformer Mixin](https://scikit-learn.org/stable/modules/generated/sklearn.base.TransformerMixin.html), [BaseEstimator](https://scikit-learn.org/stable/modules/generated/sklearn.base.BaseEstimator.html), [RegressorMixin](https://scikit-learn.org/stable/modules/generated/sklearn.base.RegressorMixin.html) class from `scikit-learn` library to be support API.
+Additionally, the code follows the schemas of [Transformer Mixin](https://scikit-learn.org/stable/modules/generated/sklearn.base.TransformerMixin.html), [BaseEstimator](https://scikit-learn.org/stable/modules/generated/sklearn.base.BaseEstimator.html), [RegressorMixin](https://scikit-learn.org/stable/modules/generated/sklearn.base.RegressorMixin.html) classes from `scikit-learn` library to be support API.
 
 
 ## Files
