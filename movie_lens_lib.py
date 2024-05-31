@@ -255,6 +255,16 @@ class ClusterBasedRegressor(BaseEstimator, RegressorMixin):
             df.columns = [f'Cluster_{stat}_{cluster}' for stat, cluster in df.columns]
             return df
 
+        def calculate_mean(df):
+            for cluster in range(self.n_movie_clusters):
+                count_col = f'Cluster_count_{cluster}'
+                sum_col = f'Cluster_sum_{cluster}'
+                mean_col = f'Cluster_mean_{cluster}'
+
+                df[mean_col] = df[sum_col] / df[count_col]
+
+            return df
+
         self.users_df = (
             pd.concat([X.drop(['timestamp'], axis=1), y], axis=1)
                 .merge(self.movies_hot_df['Cluster'], left_on='movieId', right_index=True)
@@ -268,17 +278,9 @@ class ClusterBasedRegressor(BaseEstimator, RegressorMixin):
                     values=['count', 'sum'])
                 .fillna(0)
                 .pipe(column_labels)
+                .pipe(calculate_mean)
+                .fillna(0)
         )
-        
-
-        for cluster in range(self.n_movie_clusters):
-            count_col = f'Cluster_count_{cluster}'
-            sum_col = f'Cluster_sum_{cluster}'
-            mean_col = f'Cluster_mean_{cluster}'
-            self.users_df[mean_col] = self.users_df[sum_col] / self.users_df[count_col]
-
-
-
         # sum_sums = self.users_df[["Cluster_sum_" + str(x) for x in range(self.n_movie_clusters)]].sum(axis=1)
         # count_sums = self.users_df[["Cluster_count_" + str(x) for x in range(self.n_movie_clusters)]].sum(axis=1)
         # self.users_df["rating_mean"] = sum_sums / count_sums
@@ -302,13 +304,10 @@ class ClusterBasedRegressor(BaseEstimator, RegressorMixin):
         present_df = X.loc[is_present]
 
         clusters = self.movies_hot_df.loc[present_df["movieId"]]["Cluster"].astype(int)
-        columns = self.users_df[self.cluster_columns].columns
+        choices = clusters + np.arange(clusters.shape[0]) * self.cluster_columns.shape[0]
+        print(self.users_df[self.cluster_columns].isna().sum())
 
-        choices = pd.Series(self.cluster_columns[clusters])
-        choices = choices.apply(lambda x: columns.isin([x]).astype(int))
-        choices = np.vstack(choices)
-
-        user_pred = (self.users_df.loc[present_df["userId"]][self.cluster_columns] * choices).sum(axis=1)
+        user_pred = self.users_df.loc[present_df["userId"]][self.cluster_columns].to_numpy().ravel()[choices]
         y_pred[is_present] = user_pred
         return np.round(y_pred * 2) / 2 if rounded else y_pred
 
