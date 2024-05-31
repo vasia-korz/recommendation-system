@@ -127,6 +127,7 @@ class GenreBasedRegressor(BaseEstimator, RegressorMixin):
 
     def __init__(self, movies_hot_df):
         self.user_genre_df = None
+        self.genres_rating_columns = None
         self.movies_hot_df = movies_hot_df
 
     def fit(self, X, y=None):
@@ -142,34 +143,35 @@ class GenreBasedRegressor(BaseEstimator, RegressorMixin):
         #### Returns:
         Fitted regressor.
         """
-        ratings_train_df = pd.concat([X, y], axis=1)
-        self.user_genre_df = pd.DataFrame({"userId": ratings_train_df["userId"].unique()})
-        genres = self.movies_hot_df["Genres_Split"].explode().unique()
+        def normalize(df):
+            df["total"] /= df["count"]
+            return df
+        
+        def column_labels(df):
+            df.columns = [f'{stat}_{genre}' for stat, genre in df.columns]
+            return df
 
-        for genre in genres:
-            self.user_genre_df[genre] = pd.Series(np.zeros(self.user_genre_df.shape[0]))
-            self.user_genre_df["count_" + genre] = pd.Series(np.zeros(self.user_genre_df.shape[0]))
+        self.user_genre_df = (
+            self.movies_hot_df[["Genres_Split"]]
+                .explode('Genres_Split')
+                .merge(pd.concat([X, y], axis=1).drop(['timestamp'], axis=1),on='movieId')
+                .drop(["movieId"], axis=1)
+                .groupby(['userId', 'Genres_Split'])
+                .agg(total=('rating', 'sum'), count=('rating', 'count'))
+                .pipe(normalize)
+                .drop(["count"], axis=1)
+                .reset_index()
+                .rename(columns={"total": "mean"})
+                .pivot(
+                    index='userId',
+                    columns='Genres_Split',
+                    values=['mean'])
+                .pipe(column_labels)
+                .fillna(3.5)
+        )
 
-        self.user_genre_df.set_index("userId", inplace=True)
-
-        movies_exploded_df = self.movies_hot_df[["Genres_Split"]].explode('Genres_Split').rename(
-            columns={'Genres_Split': 'genre'})
-        merged_df = ratings_train_df.merge(movies_exploded_df, on='movieId')
-
-        agg_df = merged_df.groupby(['userId', 'genre']).agg(
-            total_rating=('rating', 'sum'),
-            count=('rating', 'count')
-        ).reset_index()
-
-        agg_df['average_rating'] = agg_df['total_rating'] / agg_df['count']
-
-        self.user_genre_df = agg_df.pivot(index='userId', columns='genre', values=['average_rating', 'count'])
-        self.user_genre_df.columns = [f'{stat}_{genre}' for stat, genre in self.user_genre_df.columns]
-        self.user_genre_df = self.user_genre_df.reset_index()
-        self.user_genre_df.fillna(3.5, inplace=True)
-        self.user_genre_df.drop(["count_" + col for col in genres], axis=1, inplace=True)
-        self.user_genre_df.set_index("userId", inplace=True)
-
+        self.genres_rating_columns = (self.movies_hot_df["Genres_Split"]
+                                      .apply(lambda x: self.user_genre_df.columns.get_indexer(["mean_"+y for y in x])))
         return self
 
     def predict(self, X, rounded=True, default=3.5):
@@ -187,19 +189,17 @@ class GenreBasedRegressor(BaseEstimator, RegressorMixin):
         #### Returns:
         Predicted ratings.
         """
-        y_pred = []
-        for i, row in X.iterrows():
-            y_pred.append(self._predict(row["userId"], row["movieId"], rounded, default))
-        return y_pred
+        y_pred = np.zeros(X.shape[0]) + default
+        is_present = (X["userId"].isin(self.user_genre_df.index) & X["movieId"].isin(self.movies_hot_df.index))
+        present_df = X.loc[is_present]
 
-    def _predict(self, user_id, movie_id, rounded=True, default=3.5):
-        if user_id not in self.user_genre_df.index or movie_id not in self.movies_hot_df.index:
-            return default
+        ravelled = self.user_genre_df.loc[present_df["userId"]].to_numpy().ravel()
 
-        movie_genres = self.movies_hot_df.loc[movie_id]["Genres_Split"]
-        movie_genres = ["average_rating_" + x for x in movie_genres]
-        res = self.user_genre_df.loc[user_id][movie_genres].mean()
-        return round(res * 2) / 2 if rounded else res
+        choices_relative = self.genres_rating_columns.loc[present_df["movieId"]]
+        choices_absolute = choices_relative + np.arange(choices_relative.shape[0]) * self.user_genre_df.shape[1]
+
+        y_pred[is_present] = choices_absolute.apply(lambda x: ravelled[x].mean())
+        return np.round(y_pred * 2) / 2 if rounded else y_pred
 
 
 class ClusterBasedRegressor(BaseEstimator, RegressorMixin):
@@ -224,6 +224,7 @@ class ClusterBasedRegressor(BaseEstimator, RegressorMixin):
         self.rating_multiplier = rating_multiplier
         self.year_multiplier = year_multiplier
         self.random_state = random_state
+        self.cluster_columns = np.array([f"Cluster_mean_{i}" for i in range(n_movie_clusters)])
 
     def fit(self, X, y=None):
         """
@@ -238,8 +239,6 @@ class ClusterBasedRegressor(BaseEstimator, RegressorMixin):
         #### Returns:
         Fitted regressor.
         """
-        ratings_train_df = pd.concat([X, y], axis=1)
-
         self.movies_hot_df["rating_mean"] *= self.rating_multiplier
         self.movies_hot_df['year'] *= self.year_multiplier
 
@@ -248,32 +247,39 @@ class ClusterBasedRegressor(BaseEstimator, RegressorMixin):
 
         self.movies_hot_df["rating_mean"] /= self.rating_multiplier
 
-        ratings_with_clusters = ratings_train_df.merge(self.movies_hot_df, left_on='movieId', right_index=True)
+        def column_labels(df):
+            df.columns = [f'Cluster_{stat}_{cluster}' for stat, cluster in df.columns]
+            return df
 
-        user_cluster_stats = ratings_with_clusters.groupby(['userId', 'Cluster'])['rating'].agg(
-            ['count', 'sum']).reset_index()
-        user_cluster_pivot = user_cluster_stats.pivot(index='userId', columns='Cluster',
-                                                      values=['count', 'sum']).fillna(0)
-        user_cluster_pivot.columns = [f'Cluster_{stat}_{cluster}' for stat, cluster in user_cluster_pivot.columns]
+        def calculate_mean(df):
+            for cluster in range(self.n_movie_clusters):
+                count_col = f'Cluster_count_{cluster}'
+                sum_col = f'Cluster_sum_{cluster}'
+                mean_col = f'Cluster_mean_{cluster}'
 
-        for cluster in range(self.n_movie_clusters):
-            count_col = f'Cluster_count_{cluster}'
-            sum_col = f'Cluster_sum_{cluster}'
-            mean_col = f'Cluster_mean_{cluster}'
-            if count_col in user_cluster_pivot.columns and sum_col in user_cluster_pivot.columns:
-                user_cluster_pivot[mean_col] = user_cluster_pivot[sum_col] / user_cluster_pivot[count_col]
-            else:
-                user_cluster_pivot[count_col] = 0
-                user_cluster_pivot[sum_col] = 0
-                user_cluster_pivot[mean_col] = 0
+                df[mean_col] = df[sum_col] / df[count_col]
 
-        user_cluster_pivot = user_cluster_pivot.fillna(0)
-        self.users_df = user_cluster_pivot.reset_index()
-        self.users_df.set_index("userId", inplace=True)
+            return df
 
-        sum_sums = self.users_df[["Cluster_sum_" + str(x) for x in range(self.n_movie_clusters)]].sum(axis=1)
-        count_sums = self.users_df[["Cluster_count_" + str(x) for x in range(self.n_movie_clusters)]].sum(axis=1)
-        self.users_df["rating_mean"] = sum_sums / count_sums
+        self.users_df = (
+            pd.concat([X.drop(['timestamp'], axis=1), y], axis=1)
+                .merge(self.movies_hot_df['Cluster'], left_on='movieId', right_index=True)
+                .drop(['movieId'], axis=1)
+                .groupby(['userId', 'Cluster'])['rating']
+                .agg(['count', 'sum'])
+                .reset_index()
+                .pivot(
+                    index='userId',
+                    columns='Cluster',
+                    values=['count', 'sum'])
+                .fillna(0)
+                .pipe(column_labels)
+                .pipe(calculate_mean)
+                .fillna(0)
+        )
+        # sum_sums = self.users_df[["Cluster_sum_" + str(x) for x in range(self.n_movie_clusters)]].sum(axis=1)
+        # count_sums = self.users_df[["Cluster_count_" + str(x) for x in range(self.n_movie_clusters)]].sum(axis=1)
+        # self.users_df["rating_mean"] = sum_sums / count_sums
         return self
 
     def predict(self, X, rounded=True):
@@ -289,18 +295,15 @@ class ClusterBasedRegressor(BaseEstimator, RegressorMixin):
         #### Returns:
         Predicted ratings.
         """
-        y_pred = []
-        for i, row in X.iterrows():
-            y_pred.append(self._predict(row["userId"], row["movieId"], rounded))
-        return y_pred
+        y_pred = np.zeros(X.shape[0]) + 3.5
+        is_present = (X["userId"].isin(self.users_df.index) & X["movieId"].isin(self.movies_hot_df.index))
+        present_df = X.loc[is_present]
 
-    def _predict(self, user_id, movie_id, rounded=True):
-        if user_id not in self.users_df.index or movie_id not in self.movies_hot_df.index:
-            return 3.5
+        clusters = self.movies_hot_df.loc[present_df["movieId"]]["Cluster"].astype(int)
+        choices = clusters + np.arange(clusters.shape[0]) * self.cluster_columns.shape[0]
 
-        cluster = int(self.movies_hot_df.loc[movie_id]["Cluster"])
-        user_pred = self.users_df.loc[user_id][f"Cluster_mean_{cluster}"]
-        return round(user_pred * 2) / 2 if rounded else user_pred
+        y_pred[is_present] = self.users_df.loc[present_df["userId"]][self.cluster_columns].to_numpy().ravel()[choices]
+        return np.round(y_pred * 2) / 2 if rounded else y_pred
 
 
 class MovieBasedRegressor(BaseEstimator, RegressorMixin):
@@ -340,17 +343,13 @@ class MovieBasedRegressor(BaseEstimator, RegressorMixin):
         #### Returns:
         Predicted ratings.
         """
-        y_pred = []
-        for i, row in X.iterrows():
-            y_pred.append(self._predict(row["userId"], row["movieId"], rounded))
-        return y_pred
+        y_pred = np.zeros(X.shape[0]) + 3.5
+        is_present = X["movieId"].isin(self.movie_ratings.index)
 
-    def _predict(self, user_id, movie_id, rounded=True):
-        if movie_id not in self.movie_ratings.index:
-            return 3.5
+        film_pred = self.movie_ratings.loc[X.loc[is_present]["movieId"]]
 
-        film_pred = self.movie_ratings.loc[movie_id]
-        return round(film_pred * 2) / 2 if rounded else film_pred
+        y_pred[is_present] = film_pred
+        return np.round(y_pred * 2) / 2 if rounded else y_pred
 
 
 class HybridRegressor(BaseEstimator, RegressorMixin):
