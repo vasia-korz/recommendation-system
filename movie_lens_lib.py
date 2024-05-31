@@ -98,9 +98,9 @@ def get_performance_stats(y_true, y_pred):
     #### Returns:
     Dictionary containing mse, mae, and accuracy.
     """
-    mse = custom_mse_scorer(np.array(y_pred), np.array(y_true))
-    mae = custom_mae_scorer(np.array(y_pred), np.array(y_true))
-    acc = custom_accuracy_scorer(np.array(y_pred), np.array(y_true))
+    mse = custom_mse_scorer(np.array(y_true), np.array(y_pred))
+    mae = custom_mae_scorer(np.array(y_true), np.array(y_pred))
+    acc = custom_accuracy_scorer(np.array(y_true), np.array(y_pred))
     return {"mse": mse, "mae": mae, "accuracy": acc}
 
 
