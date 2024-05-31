@@ -19,6 +19,7 @@ Each file in the repository has it's own purpose.
 | [analysis.ipynb](analysis.ipynb) | Analysis of the data and the model
 | [sample.ipynb](sample.ipynb) | A set of use cases from the library
 | [test.ipynb](test.ipynb) | The comparison of the model with the baselines using train-test split and MSE, MAE and accuracy as metrics 
+| [visualization.py](visualization.py) | A collection of functions responsible for visualizations
 
 ## Getting started
 
