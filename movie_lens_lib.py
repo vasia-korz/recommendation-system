@@ -171,7 +171,7 @@ class GenreBasedRegressor(BaseEstimator, RegressorMixin):
         )
 
         self.genres_rating_columns = (self.movies_hot_df["Genres_Split"]
-                                      .apply(lambda x: np.array(["mean_"+y for y in x])))
+                                      .apply(lambda x: self.user_genre_df.columns.get_indexer(["mean_"+y for y in x])))
         return self
 
     def predict(self, X, rounded=True, default=3.5):
@@ -193,13 +193,12 @@ class GenreBasedRegressor(BaseEstimator, RegressorMixin):
         is_present = (X["userId"].isin(self.user_genre_df.index) & X["movieId"].isin(self.movies_hot_df.index))
         present_df = X.loc[is_present]
 
-        means = np.vstack(self.genres_rating_columns.loc[present_df["movieId"]]
-                          .apply(lambda x: self.user_genre_df.columns.isin(x).astype(int) / x.shape[0]))
-        
+        ravelled = self.user_genre_df.loc[present_df["userId"]].to_numpy().ravel()
 
-        genre_user_df = self.user_genre_df.loc[present_df["userId"]].to_numpy()
+        choices_relative = self.genres_rating_columns.loc[present_df["movieId"]]
+        choices_absolute = choices_relative + np.arange(choices_relative.shape[0]) * self.user_genre_df.shape[1]
 
-        y_pred[is_present] = (genre_user_df * means).sum(axis=1)
+        y_pred[is_present] = choices_absolute.apply(lambda x: ravelled[x].mean())
         return np.round(y_pred * 2) / 2 if rounded else y_pred
 
 
