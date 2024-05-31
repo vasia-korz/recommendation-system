@@ -1,3 +1,15 @@
+"""
+Module for visualizing the performance of hybrid models compared to baseline models.
+
+Includes functions for generating visualizations of model performance metrics
+and comparing them across different user record thresholds and cluster sizes.
+
+#### Functions:
+- hybrid_vs_baselines_visualization: Generates bar plots comparing MAE, MSE, and accuracy of different models.
+- hybrid_metrics_by_user_records: Plots MSE, MAE, and accuracy against the number of records in the training set.
+- hybrid_metrics_by_cluster_size: Plots MSE and MAE against the number of clusters for hybrid models.
+"""
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -5,6 +17,17 @@ import seaborn as sns
 
 
 def hybrid_vs_baselines_visualization(results: dict):
+    """
+    Generates bar plots comparing MAE, MSE, and accuracy of different models.
+
+    #### Parameters:
+    - results: dict
+        Dictionary containing model names as keys and another dictionary as values,
+        where the inner dictionary has metric names ('mae', 'mse', 'accuracy') as keys and their values.
+
+    #### Returns:
+    None. Displays a matplotlib plot.
+    """
     result_names = results.keys()
     results = results.values()
 
@@ -52,6 +75,18 @@ def hybrid_vs_baselines_visualization(results: dict):
 
 
 def hybrid_metrics_by_user_records(results, thresholds):
+    """
+    Plots MSE, MAE, and accuracy against the number of records in the training set.
+
+    #### Parameters:
+    - results: dict
+        Dictionary where keys are thresholds and values are another dictionary with 'mse', 'mae', and 'accuracy' as keys.
+    - thresholds: list
+        List of thresholds for the number of records in the training set.
+
+    #### Returns:
+    None. Displays a matplotlib plot.
+    """
     sns.set_theme(style="whitegrid")
     mse_values = [results[thresh]['mse'] for thresh in thresholds]
     mae_values = [results[thresh]['mae'] for thresh in thresholds]
@@ -89,21 +124,17 @@ def hybrid_metrics_by_user_records(results, thresholds):
 
 
 def hybrid_metrics_by_cluster_size(hybrid_results: dict):
+    """
+    Plots MSE and MAE against the number of clusters for hybrid models.
+
+    #### Parameters:
+    - hybrid_results: dict
+        Dictionary where keys are the number of clusters and values are another dictionary
+        with 'mse' and 'mae' as keys.
+
+    #### Returns:
+    None. Displays a matplotlib plot.
+    """
     sns.set_theme(style="whitegrid")
     metrics_to_plot = ['mse', 'mae']
     fig, axs = plt.subplots(len(metrics_to_plot), 1, figsize=(5, 8))
-
-    sorted_keys = sorted(hybrid_results.keys())
-    for i, metric in enumerate(metrics_to_plot):
-        data = [hybrid_results[k][metric] for k in sorted_keys]
-
-        axs[i].plot(sorted_keys, data, marker='o')
-        axs[i].set_title(metric.upper(), fontsize=14)
-        axs[i].set_xlabel('Number of clusters', fontsize=12)
-        axs[i].set_ylabel(metric.upper(), fontsize=12)
-        axs[i].set_xticks(sorted_keys)
-        axs[i].set_xticklabels(sorted_keys)
-        axs[i].grid(color='#e8e8e8')
-
-    plt.tight_layout()
-    plt.show()
