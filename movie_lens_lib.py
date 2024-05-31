@@ -143,9 +143,6 @@ class GenreBasedRegressor(BaseEstimator, RegressorMixin):
         #### Returns:
         Fitted regressor.
         """
-        genres = self.movies_hot_df["Genres_Split"].explode().unique()
-        user_ids = X["userId"].unique()
-
         def normalize(df):
             df["total"] /= df["count"]
             return df
@@ -201,9 +198,9 @@ class GenreBasedRegressor(BaseEstimator, RegressorMixin):
         
 
         genre_user_df = self.user_genre_df.loc[present_df["userId"]].to_numpy()
-        genre_pred = (genre_user_df * means).sum(axis=1)
-        y_pred[is_present] = genre_pred
-        return y_pred
+
+        y_pred[is_present] = (genre_user_df * means).sum(axis=1)
+        return np.round(y_pred * 2) / 2 if rounded else y_pred
 
 
 class ClusterBasedRegressor(BaseEstimator, RegressorMixin):
@@ -305,10 +302,8 @@ class ClusterBasedRegressor(BaseEstimator, RegressorMixin):
 
         clusters = self.movies_hot_df.loc[present_df["movieId"]]["Cluster"].astype(int)
         choices = clusters + np.arange(clusters.shape[0]) * self.cluster_columns.shape[0]
-        print(self.users_df[self.cluster_columns].isna().sum())
 
-        user_pred = self.users_df.loc[present_df["userId"]][self.cluster_columns].to_numpy().ravel()[choices]
-        y_pred[is_present] = user_pred
+        y_pred[is_present] = self.users_df.loc[present_df["userId"]][self.cluster_columns].to_numpy().ravel()[choices]
         return np.round(y_pred * 2) / 2 if rounded else y_pred
 
 
@@ -355,7 +350,7 @@ class MovieBasedRegressor(BaseEstimator, RegressorMixin):
         film_pred = self.movie_ratings.loc[X.loc[is_present]["movieId"]]
 
         y_pred[is_present] = film_pred
-        return y_pred
+        return np.round(y_pred * 2) / 2 if rounded else y_pred
 
 
 class HybridRegressor(BaseEstimator, RegressorMixin):
