@@ -137,4 +137,19 @@ def hybrid_metrics_by_cluster_size(hybrid_results: dict):
     """
     sns.set_theme(style="whitegrid")
     metrics_to_plot = ['mse', 'mae']
-    fig, axs = plt.subplots(len(metrics_to_plot), 1, figsize=(5, 8))
+    fig, axs = plt.subplots(1, len(metrics_to_plot), figsize=(10, 5))
+
+    sorted_keys = sorted(hybrid_results.keys())
+    for i, metric in enumerate(metrics_to_plot):
+        data = [hybrid_results[k][metric] for k in sorted_keys]
+
+        axs[i].plot(sorted_keys, data, marker='o')
+        axs[i].set_title(metric.upper(), fontsize=14)
+        axs[i].set_xlabel('Number of clusters', fontsize=12)
+        axs[i].set_ylabel(metric.upper(), fontsize=12)
+        axs[i].set_xticks(sorted_keys)
+        axs[i].set_xticklabels(sorted_keys)
+        axs[i].grid(color='#e8e8e8')
+
+    plt.tight_layout()
+    plt.show()
